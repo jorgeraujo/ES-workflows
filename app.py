@@ -2,11 +2,12 @@ import boto3
 import os
 from flask import Flask
 from flask import Flask, request, redirect, url_for, flash, render_template
+from werkzeug.utils import secure_filename
 from flask.ext.cors import CORS
 
 
 
-UPLOAD_FOLDER = '/images'
+UPLOAD_FOLDER = 'images'
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 
 app = Flask(__name__)
@@ -19,12 +20,17 @@ def index():
     return render_template("index.html")
 
 
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
 @app.route('/login', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
         # check if the post request has the file part
         if 'file' not in request.files:
-            print(request[0].files)
+            print('file not in request files')
             print(request.url)
             return redirect(request.url)
         file = request.files['file']
@@ -38,7 +44,7 @@ def login():
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             print ('File saved')
-            return redirect(url_for('/'))
+            return redirect(url_for('payment'))
     return render_template("login.html")
 
 

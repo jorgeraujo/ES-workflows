@@ -1,14 +1,7 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>Login</title>
-  </head>
-  <body>
-    <h1>Login</h1>
-    <form action="/login", method="post">
-      <input type="file" name="pic" accept="image/*" value="Your face goes here">
-      <input type="submit" value="Submit">
-    </form>
-  </body>
-</html>
+<!doctype html>
+   <title>Login</title>
+   <h1>Upload your face</h1>
+   <form method=post enctype=multipart/form-data>
+     <p><input type=file name=file>
+        <input type=submit value=Upload>
+   </form>
