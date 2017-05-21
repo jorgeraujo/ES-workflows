@@ -1,4 +1,5 @@
 import boto3
+import datetime
 import os
 from flask import Flask
 from flask import Flask, request, redirect, url_for, flash, render_template
@@ -47,7 +48,30 @@ def login():
             return redirect(url_for('payment'))
     return render_template("login.html")
 
+    #s3: es-workflows-photos
+
+
 
 @app.route('/payment', methods=['GET','POST'])
 def payment():
-    return render_template('payment.html')
+    # Connect to queue (SQS)
+    sqs = boto3.resource("sqs")
+    queue = sqs.get_queue_by_name(QueueName='filita')
+
+
+    # Send message to queue
+    queue.send_message(
+        QueueUrl="https://sqs.eu-west-1.amazonaws.com/727565144708/filita",
+        MessageBody="dsdf",
+        DelaySeconds=5,
+    )
+    client = boto3.client('sqs')
+    response = client.receive_message(
+    QueueUrl='https://sqs.eu-west-1.amazonaws.com/727565144708/filita',
+    MaxNumberOfMessages=1
+)
+
+
+
+    print response
+    return "ss"
