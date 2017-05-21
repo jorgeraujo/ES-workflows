@@ -57,8 +57,28 @@ def login():
             b = s3.Bucket('es-workflows-es')
             objects = b.objects.all()
 
-            s3.Bucket('es-workflows-es').put_object(Key=file.filename,Body=file)
+            b.put_object(Key=file.filename,Body=file)
             print ('File saved to S3')
+
+            # Connect to queue (SQS)
+            sqs = boto3.resource("sqs")
+            queue = sqs.get_queue_by_name(QueueName='filita')
+
+
+            # Send message to queue
+            queue.send_message(
+                QueueUrl="https://sqs.eu-west-1.amazonaws.com/727565144708/filita",
+                MessageBody=file.filename,
+                DelaySeconds=5,
+            )
+
+            # Read message from queue
+            client = boto3.client('sqs')
+            response = client.receive_message(
+            QueueUrl='https://sqs.eu-west-1.amazonaws.com/727565144708/filita',
+            MaxNumberOfMessages=1
+            )
+            print(response)
 
             return redirect(url_for('payment'))
     return render_template("login.html")
@@ -66,24 +86,5 @@ def login():
 
 @app.route('/payment', methods=['GET','POST'])
 def payment():
-
-    # Connect to queue (SQS)
-    sqs = boto3.resource("sqs")
-    queue = sqs.get_queue_by_name(QueueName='filita')
-
-
-    # Send message to queue
-    queue.send_message(
-        QueueUrl="https://sqs.eu-west-1.amazonaws.com/727565144708/filita",
-        MessageBody="dsdf",
-        DelaySeconds=5,
-    )
-
-    # Read message from queue
-    client = boto3.client('sqs')
-    response = client.receive_message(
-    QueueUrl='https://sqs.eu-west-1.amazonaws.com/727565144708/filita',
-    MaxNumberOfMessages=1
-    )
 
     return render_template("payment.html")
