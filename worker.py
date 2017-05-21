@@ -22,11 +22,12 @@ if __name__ == '__main__':
             QueueUrl=queue_url,
             MaxNumberOfMessages=1
             )
+            receiptHandle = response["Messages"][0]["ReceiptHandle"]
             print(response)
 
             # Delete from queue
-            delete = client.delete_message(QueueUrl=queue_url, ReceiptHandle=receiptHandle) #o que é se põe no receiptHandle?
-            print(deleted)
+            delete = client.delete_message(QueueUrl=queue_url, ReceiptHandle=receiptHandle)
+            print('deleted')
         except Exception as e:
             print(e)
             pass
