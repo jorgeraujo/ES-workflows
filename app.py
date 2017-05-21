@@ -2,14 +2,12 @@ import boto3
 from botocore.client import Config
 
 import datetime
-
 import os
 
 from flask import Flask, request, redirect, url_for, flash, render_template
 from flask_cors import CORS
 
 from werkzeug.utils import secure_filename
-
 from json import dumps
 
 UPLOAD_FOLDER = 'images'
@@ -33,8 +31,6 @@ def index():
 
 @app.route('/login', methods=['GET','POST'])
 def login():
-
-
 
     if request.method == 'POST':
         # check if the post request has the file part
@@ -64,15 +60,13 @@ def login():
             s3.Bucket('es-workflows-es').put_object(Key=file.filename,Body=file)
             print ('File saved to S3')
 
-            return render_template("payment.html")
+            return redirect(url_for('payment'))
     return render_template("login.html")
-
-    #s3: es-workflows-photos
-
 
 
 @app.route('/payment', methods=['GET','POST'])
 def payment():
+
     # Connect to queue (SQS)
     sqs = boto3.resource("sqs")
     queue = sqs.get_queue_by_name(QueueName='filita')
@@ -84,13 +78,12 @@ def payment():
         MessageBody="dsdf",
         DelaySeconds=5,
     )
+
+    # Read message from queue
     client = boto3.client('sqs')
     response = client.receive_message(
     QueueUrl='https://sqs.eu-west-1.amazonaws.com/727565144708/filita',
     MaxNumberOfMessages=1
-)
+    )
 
-
-
-    print response
-    return "ss"
+    return render_template("payment.html")
