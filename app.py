@@ -41,8 +41,6 @@ def upload_file(request):
     if file and allowed_file(file.filename):
         print('File and allowed filename')
         filename = secure_filename(file.filename)
-        # file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        # file.seek(0)
 
         #send to s3
         s3client = boto3.client('s3', config=Config(signature_version='s3v4'))
@@ -103,16 +101,11 @@ def register():
         data = request.form
 
         url = upload_file(request)
-        # #send to s3
-        # s3 = boto3.resource('s3', config=Config(signature_version='s3v4'))
-        # b = s3.Bucket('es-workflows-es')
-        # objects = b.objects.all()
-        #
-        # b.put_object(Key=file.filename,Body=file)
 
         #do register in sdb
         simpleDB = boto3.client('sdb')
-
+        simpleDB.create_domain(DomainName='ESWorkflows')
+        
         import uuid
         uuid = str(uuid.uuid4())
 
@@ -133,7 +126,7 @@ def register():
                 {
                     'Name' : 'Photo',
                     'Value' : url,
-                    'Replace' : False
+                    'Replace' : True
                 },
             ]
         )
