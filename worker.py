@@ -9,7 +9,7 @@ if __name__ == '__main__':
 
     # Connect to Data Store (S3 Bucket)
     s3client = boto3.client('s3', config=Config(signature_version='s3v4'))
-    bucket_name = 'es-workflows-es'
+    bucket_name = 'es-workflows-login'
 
     # Connect to SimpleDB
     conn_simpleDB = boto3.client('sdb')
