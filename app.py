@@ -12,6 +12,7 @@ from json import dumps
 
 UPLOAD_FOLDER = 'images'
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
+
 bucket_login = 'es-workflows-login'
 bucket_register = 'es-workflows-register'
 input_queue = 'https://sqs.eu-west-1.amazonaws.com/727565144708/filita'
@@ -101,6 +102,20 @@ def login():
 @app.route('/payment', methods=['GET','POST'])
 def payment():
     return render_template("payment.html")
+
+@app.route('/get_all_users', methods=['GET','POST'])
+def getUsers():
+    # Connect to SimpleDB
+    conn_simpleDB = boto3.client('sdb')
+    users = conn_simpleDB.select(SelectExpression="SELECT * FROM ESWorkflows")
+
+    response = users["Items"]
+    data = []
+    for i in response:
+        compare = rekognition.compare_faces(photo, i["Attributes"][1]["Value"])
+        print compare["FaceMatches"][0]["Similarity"]
+
+    return "GET ALL USERS"
 
 
 @app.route('/register', methods=['GET','POST'])

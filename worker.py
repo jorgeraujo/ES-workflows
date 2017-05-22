@@ -34,6 +34,17 @@ if __name__ == '__main__':
             photo = s3client.get_object(Bucket=bucket_name,Key=messageBody)["Body"].read()
             print("found photo")
 
+            #rekognition
+            rekognition = boto3.client('rekognition')
+
+            users = conn_simpleDB.select(SelectExpression="SELECT * FROM ESWorkflows")
+
+            response = users["Items"]
+            data = []
+            for i in response:
+                compare = rekognition.compare_faces(SourceImage = photo,TargetImage= i["Attributes"][1]["Value"])
+                print compare["FaceMatches"][0]["Similarity"]
+
         except Exception as e:
             print(e)
             pass
