@@ -1,14 +1,10 @@
 import boto3
 from botocore.client import Config
-
 import datetime
 import time
-
 import os
-
 from flask import Flask, request, redirect, url_for, flash, render_template
 from flask_cors import CORS
-
 from werkzeug.utils import secure_filename
 from json import dumps
 
@@ -102,19 +98,42 @@ def login():
                 DelaySeconds=0,
             )
 
-            time.sleep(5)
-            login_result = client.receive_message(
-            QueueUrl=read_from_url,
-            MaxNumberOfMessages=1
-            )
-            receiptHandle = login_result["Messages"][0]["ReceiptHandle"]
-            # Delete from queue
-            delete = client.delete_message(QueueUrl=read_from_url, ReceiptHandle=receiptHandle)
+            while (True):
+                try:
+                    login_result = client.receive_message(
+                    QueueUrl=read_from_url,
+                    MaxNumberOfMessages=1,
+                    AttributeNames = ['All'],
+                    MessageAttributeNames=[
+                        'credit',
+                        'user'
+                    ]
+                    )
+                    receiptHandle = login_result["Messages"][0]["ReceiptHandle"]
+                    body = login_result["Messages"][0]["Body"]
 
-            print login_result["Messages"][0]["Body"]
-            if login_result["Messages"][0]["Body"]["status"] == 'SUCCESS':
+                    if body == "SUCCESS":
+                        print "SUCCESS"
+                        attributes = login_result["Messages"][0]["MessageAttributes"]
+                        # Delete from queue
+                        delete = client.delete_message(QueueUrl=read_from_url, ReceiptHandle=receiptHandle)
 
-                return redirect(url_for('payment'))
+
+                        if float(attributes["credit"]["StringValue"]) >= 5:
+                            return redirect(url_for('payment'))
+                        else:
+                            return redirect(url_for('payment_manual'))
+                    if body == "FAILED":
+                        print "FAILED"
+                        return redirect(url_for('login'))
+                except Exception as e:
+                    # print (e)
+                    pass
+
+
+            # print login_result["Messages"][0]["Body"]
+            # if login_result["Messages"][0]["Body"]["status"] == 'SUCCESS':
+            #     return redirect(url_for('payment'))
 
 
         except Exception as e:
@@ -125,22 +144,18 @@ def login():
 
 @app.route('/payment', methods=['GET','POST'])
 def payment():
+    # Delete from queue
+    # delete = client.delete_message(QueueUrl=read_from_url, ReceiptHandle=receiptHandle)
 
     return render_template("payment.html")
 
-@app.route('/get_all_users', methods=['GET','POST'])
-def getUsers():
-    # Connect to SimpleDB
-    conn_simpleDB = boto3.client('sdb')
-    users = conn_simpleDB.select(SelectExpression="SELECT * FROM ESWorkflows")
+@app.route('/confirm', methods=['GET','POST'])
+def confirm():
+    return None
 
-    response = users["Items"]
-    data = []
-    for i in response:
-        compare = rekognition.compare_faces(photo, i["Attributes"][1]["Value"])
-        print compare["FaceMatches"][0]["Similarity"]
-
-    return "GET ALL USERS"
+@app.route('/payment_manual', methods=['GET','POST'])
+def payment_manual():
+    return render_template("payment_manual.html")
 
 
 @app.route('/register', methods=['GET','POST'])

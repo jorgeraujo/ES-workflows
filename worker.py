@@ -60,12 +60,15 @@ def rekognition_loop(response, messageBody):
                     },
                     DelaySeconds=0,
                 )
-                return
-        writing = client.send_message(
-            QueueUrl=queue_output_url,
-            MessageBody= 'FAILED',
-            DelaySeconds=0,
-        )
+                print("<<<<<<<<<<<<<<<<<<FOUND MATCH>>>>>>>>>>>>>>>>")
+                return None
+
+    writing = client.send_message(
+        QueueUrl=queue_output_url,
+        MessageBody= 'FAILED',
+        DelaySeconds=0,
+    )
+
 
 if __name__ == '__main__':
     # Connect to queue (SQS)
