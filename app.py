@@ -2,6 +2,8 @@ import boto3
 from botocore.client import Config
 
 import datetime
+import time
+
 import os
 
 from flask import Flask, request, redirect, url_for, flash, render_template
@@ -15,7 +17,6 @@ ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 
 bucket_login = 'es-workflows-login'
 bucket_register = 'es-workflows-register'
-input_queue = 'https://sqs.eu-west-1.amazonaws.com/727565144708/filita'
 
 app = Flask(__name__)
 app.secret_key = 'some_secret'
@@ -27,7 +28,7 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def upload_file(request,action):
+def upload_file(request,action,uuid):
     # check if the post request has the file part
     if 'file' not in request.files:
         print('file not in request files')
@@ -50,16 +51,18 @@ def upload_file(request,action):
             s3client = boto3.client('s3', config=Config(signature_version='s3v4'))
 
             s3client.put_object(Bucket=bucket_login, Key=file.filename,Body=file)
+            print("File "+file.filename +" is in S3")
 
             url = s3client.generate_presigned_url('get_object', {'Bucket': bucket_login, 'Key': file.filename},(3600 * 24) * 60)
+
             return url
 
         if action == 'register':
             #send to s3
             s3client = boto3.client('s3', config=Config(signature_version='s3v4'))
 
-            s3client.put_object(Bucket=bucket_register, Key=file.filename,Body=file)
-
+            s3client.put_object(Bucket=bucket_register, Key=uuid+'.png',Body=file)
+            print("File "+uuid +".png is in S3")
             url = s3client.generate_presigned_url('get_object', {'Bucket': bucket_register, 'Key': file.filename},(3600 * 24) * 60)
             return url
 
@@ -77,20 +80,39 @@ def login():
 
     if request.method == 'POST':
         try:
-            url = upload_file(request,'login')
+            url = upload_file(request,'login', None)
             print(url)
             file = request.files['file']
 
             # Connect to queue (SQS)
             sqs = boto3.resource("sqs")
-            queue = sqs.get_queue_by_name(QueueName='filita')
+            #SQS Client
+            client = boto3.client('sqs')
+            #Input queue
+            write_to = sqs.get_queue_by_name(QueueName='filita')
+            write_to_url = write_to.url
+            #Output queue
+            read_from = sqs.get_queue_by_name(QueueName='output_login_queue')
+            read_from_url = read_from.url
 
             # Send message to queue
-            queue.send_message(
-                QueueUrl=input_queue,
+            write_to.send_message(
+                QueueUrl=write_to_url,
                 MessageBody=file.filename,
                 DelaySeconds=5,
             )
+
+            time.sleep(5)
+            login_result = client.receive_message(
+            QueueUrl=read_from_url,
+            MaxNumberOfMessages=1
+            )
+            receiptHandle = login_result["Messages"][0]["ReceiptHandle"]
+            # Delete from queue
+            delete = client.delete_message(QueueUrl=read_from_url, ReceiptHandle=receiptHandle)
+
+            if login_result["Messages"][0]["Body"] == 'SUCCESS':
+                return redirect(url_for('payment'))
 
 
         except Exception as e:
@@ -121,17 +143,16 @@ def getUsers():
 @app.route('/register', methods=['GET','POST'])
 def register():
     if request.method == 'POST':
+        import uuid
+        uuid = str(uuid.uuid4())
 
         data = request.form
 
-        url = upload_file(request,'register')
+        url = upload_file(request,'register',uuid)
 
         #do register in sdb
         simpleDB = boto3.client('sdb')
         simpleDB.create_domain(DomainName='ESWorkflows')
-
-        import uuid
-        uuid = str(uuid.uuid4())
 
         resolve = simpleDB.put_attributes(
             DomainName="ESWorkflows",
@@ -149,7 +170,7 @@ def register():
                 },
                 {
                     'Name' : 'Photo',
-                    'Value' : url,
+                    'Value' : uuid,
                     'Replace' : True
                 },
             ]

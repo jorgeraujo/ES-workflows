@@ -1,49 +1,94 @@
 import boto3
 from botocore.client import Config
+import sys
+
+reload(sys)
+sys.setdefaultencoding('utf8')
+
+def compare_faces(bucket, key, bucket_target, key_target, threshold=90, region="eu-west-1"):
+	#rekognition
+    rekognition = boto3.client('rekognition', region)
+
+    response = rekognition.compare_faces(
+	    SourceImage={
+			"S3Object": {
+				"Bucket": bucket,
+				"Name": key,
+			}
+		},
+		TargetImage={
+			"S3Object": {
+				"Bucket": bucket_target,
+				"Name": key_target,
+			}
+		},
+	    SimilarityThreshold=threshold,
+	)
+    print(response['SourceImageFace'])
+    print(response['FaceMatches'])
+    return response['SourceImageFace'], response['FaceMatches']
+
 
 if __name__ == '__main__':
     # Connect to queue (SQS)
     sqs = boto3.resource("sqs")
-    queue = sqs.get_queue_by_name(QueueName='filita')
-    queue_url = queue.url
+
+    #Input queue
+    queue_input = sqs.get_queue_by_name(QueueName='filita')
+    queue_input_url = queue_input.url
+
+    #Output queue
+    queue_output = sqs.get_queue_by_name(QueueName="output_login_queue")
+    queue_output_url = queue_output.url
 
     # Connect to Data Store (S3 Bucket)
     s3client = boto3.client('s3', config=Config(signature_version='s3v4'))
-    bucket_name = 'es-workflows-login'
+    bucket_login = 'es-workflows-login'
+    bucket_register = 'es-workflows-register'
 
     # Connect to SimpleDB
     conn_simpleDB = boto3.client('sdb')
+
+    #region
+    region="eu-west-1"
 
     while (True):
         try:
             # Read message from queue
             client = boto3.client('sqs')
             response = client.receive_message(
-            QueueUrl=queue_url,
+            QueueUrl=queue_input_url,
             MaxNumberOfMessages=1
             )
             receiptHandle = response["Messages"][0]["ReceiptHandle"]
             messageBody = response["Messages"][0]["Body"]
-            print(response)
+            # print(response)
 
             # Delete from queue
-            delete = client.delete_message(QueueUrl=queue_url, ReceiptHandle=receiptHandle)
-            print('deleted message from queue')
+            delete = client.delete_message(QueueUrl=queue_input_url, ReceiptHandle=receiptHandle)
 
             # Get photo from S3
-            photo = s3client.get_object(Bucket=bucket_name,Key=messageBody)["Body"].read()
-            print("found photo")
-
-            #rekognition
-            rekognition = boto3.client('rekognition')
+            sourceImage = s3client.get_object(Bucket=bucket_login,Key=messageBody)["Body"].read()
 
             users = conn_simpleDB.select(SelectExpression="SELECT * FROM ESWorkflows")
 
             response = users["Items"]
+
             data = []
             for i in response:
-                compare = rekognition.compare_faces(SourceImage = photo,TargetImage= i["Attributes"][1]["Value"])
-                print compare["FaceMatches"][0]["Similarity"]
+                targetImage = i["Attributes"][1]["Value"] + ".png"
+                source_face, matches = compare_faces(bucket_login, messageBody, bucket_register, targetImage)
+                for match in matches:
+                    print "Target Face ({Confidence}%)".format(**match['Face'])
+                    print "  Similarity : {}%".format(match['Similarity'])
+
+                    if match["Similarity" ] > 95.0:
+                        writing = client.send_message(
+                            QueueUrl=queue_output_url,
+                            MessageBody='SUCCESS',
+                            DelaySeconds=0,
+                        )
+
 
         except Exception as e:
             print(e)
