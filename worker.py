@@ -5,7 +5,7 @@ import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-def compare_faces(bucket, key, bucket_target, key_target, threshold=90, region="eu-west-1"):
+def compare_faces(bucket, key, bucket_target, key_target, threshold=0, region="eu-west-1"):
 	#rekognition
     rekognition = boto3.client('rekognition', region)
 
@@ -77,6 +77,7 @@ if __name__ == '__main__':
             data = []
             for i in response:
                 targetImage = i["Attributes"][1]["Value"] + ".png"
+                print i["Attributes"]
                 source_face, matches = compare_faces(bucket_login, messageBody, bucket_register, targetImage)
                 for match in matches:
                     print "Target Face ({Confidence}%)".format(**match['Face'])
@@ -85,11 +86,15 @@ if __name__ == '__main__':
                     if match["Similarity" ] > 95.0:
                         writing = client.send_message(
                             QueueUrl=queue_output_url,
-                            MessageBody='SUCCESS',
+                            MessageBody= i["Attributes"][0]["Value"],
                             DelaySeconds=0,
                         )
 
-
+            writing = client.send_message(
+                QueueUrl=queue_output_url,
+                MessageBody= 'FAILED',
+                DelaySeconds=0,
+            )
         except Exception as e:
             print(e)
             pass

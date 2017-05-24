@@ -99,7 +99,7 @@ def login():
             write_to.send_message(
                 QueueUrl=write_to_url,
                 MessageBody=file.filename,
-                DelaySeconds=5,
+                DelaySeconds=0,
             )
 
             time.sleep(5)
@@ -111,7 +111,9 @@ def login():
             # Delete from queue
             delete = client.delete_message(QueueUrl=read_from_url, ReceiptHandle=receiptHandle)
 
-            if login_result["Messages"][0]["Body"] == 'SUCCESS':
+            print login_result["Messages"][0]["Body"]
+            if login_result["Messages"][0]["Body"]["status"] == 'SUCCESS':
+
                 return redirect(url_for('payment'))
 
 
@@ -123,6 +125,7 @@ def login():
 
 @app.route('/payment', methods=['GET','POST'])
 def payment():
+
     return render_template("payment.html")
 
 @app.route('/get_all_users', methods=['GET','POST'])
