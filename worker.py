@@ -5,7 +5,10 @@ import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-def compare_faces(bucket, key, bucket_target, key_target, threshold=0, region="eu-west-1"):
+bucket_login = 'es-workflows-login'
+bucket_register = 'es-workflows-register'
+
+def compare_faces(bucket, key, bucket_target, key_target, threshold=80, region="eu-west-1"):
 	#rekognition
     rekognition = boto3.client('rekognition', region)
 
@@ -29,6 +32,41 @@ def compare_faces(bucket, key, bucket_target, key_target, threshold=0, region="e
     return response['SourceImageFace'], response['FaceMatches']
 
 
+def rekognition_loop(response, messageBody):
+
+    for i in response:
+        targetImage = i["Attributes"][1]["Value"] + ".png"
+        print i["Attributes"]
+        source_face, matches = compare_faces(bucket_login, messageBody, bucket_register, targetImage)
+        for match in matches:
+            print "Target Face ({Confidence}%)".format(**match['Face'])
+            print "  Similarity : {}%".format(match['Similarity'])
+
+            if match["Similarity" ] > 90.0:
+                writing = client.send_message(
+                    QueueUrl=queue_output_url,
+                    MessageBody= 'SUCCESS',
+                    MessageAttributes={
+                        'user': {
+                            'StringValue': i["Attributes"][2]["Value"],
+                            'DataType': 'String',
+                        },
+                        'credit': {
+                            'StringValue': i["Attributes"][0]["Value"],
+                            'DataType': 'Number',
+                        },
+
+
+                    },
+                    DelaySeconds=0,
+                )
+                return
+        writing = client.send_message(
+            QueueUrl=queue_output_url,
+            MessageBody= 'FAILED',
+            DelaySeconds=0,
+        )
+
 if __name__ == '__main__':
     # Connect to queue (SQS)
     sqs = boto3.resource("sqs")
@@ -43,8 +81,6 @@ if __name__ == '__main__':
 
     # Connect to Data Store (S3 Bucket)
     s3client = boto3.client('s3', config=Config(signature_version='s3v4'))
-    bucket_login = 'es-workflows-login'
-    bucket_register = 'es-workflows-register'
 
     # Connect to SimpleDB
     conn_simpleDB = boto3.client('sdb')
@@ -74,27 +110,8 @@ if __name__ == '__main__':
 
             response = users["Items"]
 
-            data = []
-            for i in response:
-                targetImage = i["Attributes"][1]["Value"] + ".png"
-                print i["Attributes"]
-                source_face, matches = compare_faces(bucket_login, messageBody, bucket_register, targetImage)
-                for match in matches:
-                    print "Target Face ({Confidence}%)".format(**match['Face'])
-                    print "  Similarity : {}%".format(match['Similarity'])
+            rekognition_loop(response, messageBody)
 
-                    if match["Similarity" ] > 95.0:
-                        writing = client.send_message(
-                            QueueUrl=queue_output_url,
-                            MessageBody= i["Attributes"][0]["Value"],
-                            DelaySeconds=0,
-                        )
-
-            writing = client.send_message(
-                QueueUrl=queue_output_url,
-                MessageBody= 'FAILED',
-                DelaySeconds=0,
-            )
         except Exception as e:
-            print(e)
+            # print(e)
             pass
