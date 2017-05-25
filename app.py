@@ -19,6 +19,7 @@ app.secret_key = 'some_secret'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 CORS(app)
 
+simpleDB = boto3.client('sdb')
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -106,7 +107,8 @@ def login():
                     AttributeNames = ['All'],
                     MessageAttributeNames=[
                         'credit',
-                        'user'
+                        'user',
+                        'itemName'
                     ]
                     )
                     receiptHandle = login_result["Messages"][0]["ReceiptHandle"]
@@ -118,9 +120,8 @@ def login():
                         # Delete from queue
                         delete = client.delete_message(QueueUrl=read_from_url, ReceiptHandle=receiptHandle)
 
-
                         if float(attributes["credit"]["StringValue"]) >= 5:
-                            return redirect(url_for('payment'))
+                            return redirect(url_for('payment', itemname = attributes["itemName"]["StringValue"], credit = float(attributes["credit"]["StringValue"]) ))
                         else:
                             return redirect(url_for('payment_manual'))
                     if body == "FAILED":
@@ -142,11 +143,23 @@ def login():
     return render_template("login.html")
 
 
-@app.route('/payment', methods=['GET','POST'])
-def payment():
+@app.route('/payment/<itemname>/<credit>/', methods=['GET','POST'])
+def payment(itemname, credit):
     # Delete from queue
     # delete = client.delete_message(QueueUrl=read_from_url, ReceiptHandle=receiptHandle)
+    update_credit = float(credit)-5
+    u_credit = str(update_credit)
 
+    response = simpleDB.put_attributes(
+    DomainName='ESWorkflows',
+    ItemName=itemname,
+    Attributes=[
+        {
+            'Name': 'Credit',
+            'Value': u_credit,
+            'Replace': True
+        },
+    ])
     return render_template("payment.html")
 
 @app.route('/confirm', methods=['GET','POST'])
@@ -169,7 +182,7 @@ def register():
         url = upload_file(request,'register',uuid)
 
         #do register in sdb
-        simpleDB = boto3.client('sdb')
+
         simpleDB.create_domain(DomainName='ESWorkflows')
 
         resolve = simpleDB.put_attributes(

@@ -55,8 +55,10 @@ def rekognition_loop(response, messageBody):
                             'StringValue': i["Attributes"][0]["Value"],
                             'DataType': 'Number',
                         },
-
-
+                        'itemName': {
+                            'StringValue': i["Attributes"][1]["Value"],
+                            'DataType': 'String',
+                        },
                     },
                     DelaySeconds=0,
                 )
