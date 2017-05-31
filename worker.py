@@ -33,43 +33,62 @@ def compare_faces(bucket, key, bucket_target, key_target, threshold=80, region="
 
 
 def rekognition_loop(response, messageBody):
-
-    for i in response:
-        targetImage = i["Attributes"][1]["Value"] + ".png"
-        print i["Attributes"]
-        source_face, matches = compare_faces(bucket_login, messageBody, bucket_register, targetImage)
-        for match in matches:
-            print "Target Face ({Confidence}%)".format(**match['Face'])
-            print "  Similarity : {}%".format(match['Similarity'])
-
-            if match["Similarity" ] > 90.0:
-                writing = client.send_message(
-                    QueueUrl=queue_output_url,
-                    MessageBody= 'SUCCESS',
-                    MessageAttributes={
-                        'user': {
-                            'StringValue': i["Attributes"][2]["Value"],
-                            'DataType': 'String',
+    try:
+        for i in response:
+            targetImage = i["Attributes"][1]["Value"] + ".png"
+            print i["Attributes"]
+            source_face, matches = compare_faces(bucket_login, messageBody, bucket_register, targetImage)
+            for match in matches:
+                print "Target Face ({Confidence}%)".format(**match['Face'])
+                print "  Similarity : {}%".format(match['Similarity'])
+                print(match["Similarity" ])
+                if match["Similarity" ] > 90.0:
+                    writing = client.send_message(
+                        QueueUrl=queue_output_url,
+                        MessageBody= 'SUCCESS',
+                        MessageAttributes={
+                            'user': {
+                                'StringValue': i["Attributes"][2]["Value"],
+                                'DataType': 'String',
+                            },
+                            'credit': {
+                                'StringValue': i["Attributes"][0]["Value"],
+                                'DataType': 'Number',
+                            },
+                            'itemName': {
+                                'StringValue': i["Attributes"][1]["Value"],
+                                'DataType': 'String',
+                            },
                         },
-                        'credit': {
-                            'StringValue': i["Attributes"][0]["Value"],
-                            'DataType': 'Number',
-                        },
-                        'itemName': {
-                            'StringValue': i["Attributes"][1]["Value"],
-                            'DataType': 'String',
-                        },
-                    },
-                    DelaySeconds=0,
-                )
-                print("<<<<<<<<<<<<<<<<<<FOUND MATCH>>>>>>>>>>>>>>>>")
-                return None
+                        DelaySeconds=0,
+                    )
+                    print("<<<<<<<<<<<<<<<<<<FOUND MATCH>>>>>>>>>>>>>>>>")
+                    return None
 
-    writing = client.send_message(
-        QueueUrl=queue_output_url,
-        MessageBody= 'FAILED',
-        DelaySeconds=0,
-    )
+        print("<<<<<<<<<<<<<<<<<<NOT FOUND MATCH>>>>>>>>>>>>>>>>")
+        writing = client.send_message(
+            QueueUrl=queue_output_url,
+            MessageBody= 'FAILED',
+            MessageAttributes={
+                'user': {
+                    'StringValue': "doe",
+                    'DataType': 'String',
+                },
+                'credit': {
+                    'StringValue': "doe",
+                    'DataType': 'Number',
+                },
+                'itemName': {
+                    'StringValue': "0",
+                    'DataType': 'String',
+                },
+            },
+            DelaySeconds=0,
+        )
+        return None
+    except Exception as e:
+        print(e)
+
 
 
 if __name__ == '__main__':
@@ -83,6 +102,8 @@ if __name__ == '__main__':
     #Output queue
     queue_output = sqs.get_queue_by_name(QueueName="output_login_queue")
     queue_output_url = queue_output.url
+
+    print("URL:"+queue_output_url)
 
     # Connect to Data Store (S3 Bucket)
     s3client = boto3.client('s3', config=Config(signature_version='s3v4'))

@@ -117,6 +117,7 @@ def login():
                     if body == "SUCCESS":
                         print "SUCCESS"
                         attributes = login_result["Messages"][0]["MessageAttributes"]
+                        flash('You were successfully logged in')
                         # Delete from queue
                         delete = client.delete_message(QueueUrl=read_from_url, ReceiptHandle=receiptHandle)
 
@@ -126,7 +127,7 @@ def login():
                             return redirect(url_for('payment_manual'))
                     if body == "FAILED":
                         print "FAILED"
-                        return redirect(url_for('login'))
+                        return redirect(url_for('payment_manual'))
                 except Exception as e:
                     # print (e)
                     pass
@@ -160,6 +161,7 @@ def payment(itemname, credit):
             'Replace': True
         },
     ])
+
     return render_template("payment.html")
 
 @app.route('/confirm', methods=['GET','POST'])
